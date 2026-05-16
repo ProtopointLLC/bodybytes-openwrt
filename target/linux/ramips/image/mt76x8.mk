@@ -80,11 +80,10 @@ endef
 TARGET_DEVICES += alfa-network_awusfree1
 
 define Device/bodybytes_bodybytes
-  SOC := mt7628an
   DEVICE_VENDOR := Bodybytes
   DEVICE_MODEL := Bodybytes
   IMAGE_SIZE := 120m
-  DEVICE_PACKAGES := kmod-sdhci-mt7620
+  DEVICE_PACKAGES := kmod-mmc-mtk
   SUPPORTED_DEVICES := bodybytes,bodybytes
 endef
 TARGET_DEVICES += bodybytes_bodybytes
