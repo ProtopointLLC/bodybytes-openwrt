@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR MIT
 //
 // OpenWRT device tree for the Bodybytes board (MT7628AN).
-// Compiled against the in-tree mt7628an.dtsi via -I$(DTS_DIR) during
-// the OpenWRT build.  The DEVICE_DTS_DIR profile variable points here
-// so this file stays out of the openwrt/ submodule.
 
 #include "mt7628an.dtsi"
 
@@ -86,7 +83,7 @@
 
 	/*
 	 * sdxc_iot_mode: AGPIO_CFG ESD bit -> iot (routes SDXC to EPHY pads),
-	 * GPIO_MODE SDMODE -> sdxc.  Mirrors sd_iot_mode from bodybytes_uboot.dtsi.
+	 * GPIO_MODE SDMODE -> sdxc.
 	 */
 	sdxc_iot_mode: sdxc_iot_mode {
 		esd {
