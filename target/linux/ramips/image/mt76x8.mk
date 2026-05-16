@@ -79,6 +79,16 @@ define Device/alfa-network_awusfree1
 endef
 TARGET_DEVICES += alfa-network_awusfree1
 
+define Device/bodybytes_bodybytes
+  SOC := mt7628an
+  DEVICE_VENDOR := Bodybytes
+  DEVICE_MODEL := Bodybytes
+  IMAGE_SIZE := 120m
+  DEVICE_PACKAGES := kmod-sdhci-mt7620
+  SUPPORTED_DEVICES := bodybytes,bodybytes
+endef
+TARGET_DEVICES += bodybytes_bodybytes
+
 define Device/asus_rt-ac1200
   IMAGE_SIZE := 16064k
   DEVICE_VENDOR := ASUS
