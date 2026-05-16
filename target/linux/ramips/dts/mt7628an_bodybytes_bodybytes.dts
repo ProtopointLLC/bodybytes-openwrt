@@ -1,0 +1,155 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+//
+// OpenWRT device tree for the Bodybytes board (MT7628AN).
+// Compiled against the in-tree mt7628an.dtsi via -I$(DTS_DIR) during
+// the OpenWRT build.  The DEVICE_DTS_DIR profile variable points here
+// so this file stays out of the openwrt/ submodule.
+
+#include "mt7628an.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	compatible = "bodybytes,bodybytes", "mediatek,mt7628an-soc";
+	model = "Bodybytes";
+
+	chosen {
+		/*
+		 * UART2 is routed to EPHY MDI_P2 pads (MDI_TP_P2 / MDI_TN_P2,
+		 * SoC pins 47/48) by the SPL via AGPIO_CFG UART2_MODE=0 +
+		 * EPHY_APGIO_AIO_EN. That register state persists into Linux.
+		 * ephy-digital (below) ensures the kernel sees the EPHY pads
+		 * as digital on every reinit.
+		 */
+		bootargs = "console=ttyS2,115200";
+	};
+};
+
+/*
+ * SPI NOR: W25Q512JV, 64 MB, CS0, 25 MHz.
+ * NOR holds only the bootloader and WiFi EEPROM; the OS lives on eMMC.
+ * The BAR (Bank Address Register) for addresses >16 MB is handled
+ * automatically by the kernel MTD spi-nor driver.
+ */
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <25000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0 0x30000>;
+				read-only;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x30000 0x10000>;
+			};
+
+			factory: partition@40000 {
+				label = "factory";
+				reg = <0x40000 0x10000>;
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					eeprom_factory_0: eeprom@0 {
+						reg = <0x0 0x400>;
+					};
+				};
+			};
+		};
+	};
+};
+
+&pinctrl {
+	/*
+	 * ephy-digital: sets AGPIO_CFG EPHY_APGIO_AIO_EN[4:1]=0xf so all
+	 * MDI P1-P4 pads operate as digital signals.  Required for:
+	 *   - SDXC on MDI P3/P4 (sdxc_iot_mode)
+	 *   - eMMC reset GPIO on MDI_TN_P1 (mdi_p1_gpio)
+	 *   - UART2 on MDI_P2 (set by SPL; persists via AGPIO_CFG UART2_MODE=0)
+	 */
+	ephy-digital;
+
+	/*
+	 * sdxc_iot_mode: AGPIO_CFG ESD bit -> iot (routes SDXC to EPHY pads),
+	 * GPIO_MODE SDMODE -> sdxc.  Mirrors sd_iot_mode from bodybytes_uboot.dtsi.
+	 */
+	sdxc_iot_mode: sdxc_iot_mode {
+		esd {
+			groups = "esd";
+			function = "iot";
+		};
+
+		sdxc {
+			groups = "sdmode";
+			function = "sdxc";
+		};
+	};
+
+	/*
+	 * mdi_p1_gpio: SPIS_MODE=gpio -> MDI P1 pads become GPIO#14-17.
+	 * Needed so MDI_TN_P1 (GPIO#15) is driveable as the eMMC reset output.
+	 */
+	mdi_p1_gpio: mdi_p1_gpio {
+		spis_gpio {
+			groups = "spis";
+			function = "gpio";
+		};
+	};
+};
+
+/ {
+	/*
+	 * eMMC hardware reset: MDI_TN_P1 (SoC pin 42, GPIO#15, active-low).
+	 * Pulsed at power-up to clear fault conditions.
+	 * RST_n is disabled by default (EXT_CSD[162]=0x00); pulsing is a
+	 * safe no-op until the OS enables it.
+	 */
+	emmc_pwrseq: emmc_pwrseq {
+		compatible = "mmc-pwrseq-emmc";
+		reset-gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
+	};
+};
+
+/*
+ * eMMC: Kingston EMMC128-IY29-5B111, 128 GB eMMC 5.1.
+ * Connected on EPHY MDI P3/P4 pads (SoC pins 51-57) via sdxc_iot_mode.
+ * 4-bit bus, High Speed SDR (<=52 MHz, <=52 MB/s), 3.3 V VCCQ.
+ * HS200/HS400 require 1.8 V VCCQ and are unreachable on the MT7628 SDXC.
+ */
+&sdhci {
+	status = "okay";
+
+	pinctrl-0 = <&sdxc_iot_mode &mdi_p1_gpio>;
+	pinctrl-1 = <&sdxc_iot_mode &mdi_p1_gpio>;
+
+	non-removable;
+	/delete-property/ cap-sd-highspeed;
+
+	mmc-pwrseq = <&emmc_pwrseq>;
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&wmac {
+	status = "okay";
+
+	nvmem-cells = <&eeprom_factory_0>;
+	nvmem-cell-names = "eeprom";
+};
