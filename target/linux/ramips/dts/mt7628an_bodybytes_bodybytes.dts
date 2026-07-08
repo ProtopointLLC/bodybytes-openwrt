@@ -13,10 +13,11 @@
 	chosen {
 		/*
 		 * UART2 is routed to EPHY MDI_P2 pads (MDI_TP_P2 / MDI_TN_P2,
-		 * SoC pins 47/48) by the SPL via AGPIO_CFG UART2_MODE=0 +
-		 * EPHY_APGIO_AIO_EN. That register state persists into Linux.
-		 * ephy-digital (below) ensures the kernel sees the EPHY pads
-		 * as digital on every reinit.
+		 * SoC pins 47/48): UART2_MODE=0 selects the MDI P2 route;
+		 * AGPIO_CFG EPHY_GPIO_AIO_EN[4:1]=0xf switches those pads to
+		 * digital mode.  The kernel pinctrl patch sets AGPIO_CFG via
+		 * "ephy-digital" (below) at pinctrl probe time, independent of
+		 * the SPL.
 		 */
 		bootargs = "console=ttyS2,115200";
 	};
@@ -43,18 +44,18 @@
 
 			partition@0 {
 				label = "u-boot";
-				reg = <0x0 0x30000>;
+				reg = <0x0 0x40000>;
 				read-only;
 			};
 
-			partition@30000 {
+			partition@40000 {
 				label = "u-boot-env";
-				reg = <0x30000 0x10000>;
+				reg = <0x40000 0x10000>;
 			};
 
-			factory: partition@40000 {
+			factory: partition@50000 {
 				label = "factory";
-				reg = <0x40000 0x10000>;
+				reg = <0x50000 0x10000>;
 				read-only;
 
 				nvmem-layout {
@@ -67,6 +68,12 @@
 					};
 				};
 			};
+
+			partition@60000 {
+				label = "recovery";
+				reg = <0x60000 0x3fa0000>;
+				read-only;
+			};
 		};
 	};
 };
@@ -77,7 +84,7 @@
 	 * MDI P1-P4 pads operate as digital signals.  Required for:
 	 *   - SDXC on MDI P3/P4 (sdxc_iot_mode)
 	 *   - eMMC reset GPIO on MDI_TN_P1 (mdi_p1_gpio)
-	 *   - UART2 on MDI_P2 (set by SPL; persists via AGPIO_CFG UART2_MODE=0)
+	 *   - UART2 on MDI_P2 pads (UART2_MODE=0 from uart2_pins in dtsi)
 	 */
 	ephy-digital;
 
@@ -142,6 +149,14 @@
 
 &uart2 {
 	status = "okay";
+};
+
+&ethernet {
+	status = "disabled";
+};
+
+&esw {
+	status = "disabled";
 };
 
 &wmac {
