@@ -164,4 +164,15 @@
 
 	nvmem-cells = <&eeprom_factory_0>;
 	nvmem-cell-names = "eeprom";
+
+	/*
+	 * Merge on-chip eFuse RF calibration into the external EEPROM.
+	 * The eFuse (burned by MediaTek at wafer test) provides per-chip
+	 * TX power, RSSI offsets, and crystal trim. Without this, a custom
+	 * EEPROM with only a MAC address set would have zeroed RF fields
+	 * and the radio would use uncalibrated defaults.
+	 * If the external EEPROM is erased/invalid, the driver ignores this
+	 * property and copies the eFuse wholesale instead.
+	 */
+	mediatek,eeprom-merge-otp;
 };
