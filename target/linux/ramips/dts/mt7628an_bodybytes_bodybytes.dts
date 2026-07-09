@@ -80,7 +80,7 @@
 
 &pinctrl {
 	/*
-	 * ephy-digital: sets AGPIO_CFG EPHY_APGIO_AIO_EN[4:1]=0xf so all
+	 * ephy-digital: sets AGPIO_CFG EPHY_GPIO_AIO_EN[4:1]=0xf so all
 	 * MDI P1-P4 pads operate as digital signals.  Required for:
 	 *   - SDXC on MDI P3/P4 (sdxc_iot_mode)
 	 *   - eMMC reset GPIO on MDI_TN_P1 (mdi_p1_gpio)
