@@ -1,0 +1,2 @@
+config global
+	option auto_mount 1

@@ -83,7 +83,10 @@ define Device/bodybytes_bodybytes
   DEVICE_VENDOR := Bodybytes
   DEVICE_MODEL := Bodybytes
   IMAGE_SIZE := 120m
-  DEVICE_PACKAGES := kmod-mmc-mtk
+  IMAGES := sysupgrade.bin recovery.bin
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  IMAGE/recovery.bin := append-image-stage initramfs-kernel.bin | check-size
+  DEVICE_PACKAGES := kmod-mmc-mtk block-mount kmod-fs-ext4 uboot-envtools parted
   SUPPORTED_DEVICES := bodybytes,bodybytes
 endef
 TARGET_DEVICES += bodybytes_bodybytes
