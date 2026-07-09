@@ -16,6 +16,15 @@ platform_do_upgrade() {
 	local board=$(board_name)
 
 	case "$board" in
+	bodybytes,bodybytes)
+		CI_KERNPART="kernel"
+		CI_ROOTPART="rootfs"
+		CI_DATAPART="rootfs_data"
+		fw_setenv upgrade_available 1
+		fw_setenv bootcount 0
+		fw_setenv bootlimit 3
+		emmc_do_upgrade "$1"
+		;;
 	alfa-network,awusfree1)
 		[ "$(fw_printenv -n dual_image 2>/dev/null)" = "1" ] &&\
 		[ -n "$(find_mtd_part backup)" ] && {

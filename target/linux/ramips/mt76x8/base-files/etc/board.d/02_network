@@ -337,6 +337,7 @@ ramips_setup_macs()
 		label_mac=$(mtd_get_mac_binary factory 0x4)
 		wan_mac=$(macaddr_add "$label_mac" 2)
 		;;
+	bodybytes,bodybytes|\
 	onion,omega2|\
 	onion,omega2p|\
 	vocore,vocore2|\

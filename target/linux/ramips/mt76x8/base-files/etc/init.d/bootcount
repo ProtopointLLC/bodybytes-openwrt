@@ -4,6 +4,10 @@ START=99
 
 boot() {
 	case $(board_name) in
+	bodybytes,bodybytes)
+		fw_setenv upgrade_available 0
+		fw_setenv bootcount 0
+		;;
 	alfa-network,awusfree1)
 		[ -n "$(fw_printenv bootcount bootchanged 2>/dev/null)" ] &&\
 			echo -e "bootcount\nbootchanged\n" | /usr/sbin/fw_setenv -s -
