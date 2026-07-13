@@ -5,6 +5,7 @@
 #include "mt7628an.dtsi"
 
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
 
 / {
 	compatible = "bodybytes,bodybytes", "mediatek,mt7628an-soc";
@@ -117,6 +118,22 @@
 };
 
 / {
+	/*
+	 * Boot mode selector: TI DRV5032FCDBZT hall-effect sensor on MDI_TP_P1
+	 * (SoC pin 43, GPIO#14, active-low).  Low = magnet present = recovery
+	 * boot (already selected by U-Boot before Linux starts).  Exposed here
+	 * so userspace can read current physical state via /dev/input/eventN.
+	 */
+	keys {
+		compatible = "gpio-keys";
+
+		boot-mode {
+			label = "boot-mode";
+			linux,code = <BTN_0>;
+			gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
+		};
+	};
+
 	/*
 	 * eMMC hardware reset: MDI_TN_P1 (SoC pin 42, GPIO#15, active-low).
 	 * Pulsed at power-up to clear fault conditions.
