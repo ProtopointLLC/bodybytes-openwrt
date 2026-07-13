@@ -6,15 +6,36 @@ board=$(board_name)
 
 case "$board" in
 bodybytes,bodybytes)
+	# Hostname
 	uci -q set system.@system[0].hostname='bodybytes'
 	uci -q commit system
 
+	# WiFi — WPA3/WPA2 mixed (sae-mixed), US regulatory domain.
+	# Change the key via LuCI before deploying.
 	uci -q set wireless.radio0.country='US'
 	uci -q set wireless.default_radio0.ssid='Bodybytes'
 	uci -q set wireless.default_radio0.encryption='sae-mixed'
 	uci -q set wireless.default_radio0.key='bodybytes'
 	uci -q commit wireless
 
+	# IPv4: 192.168.1.1/24 (OpenWrt default, set by config_generate).
+	# IPv6: fixed ULA prefix fd13:37be:ef00::/48 ("1337beef").
+	#   A fixed prefix is safe because bodybytes is an isolated AP — no other
+	#   device will ever share this ULA space. The router address is ::1 of
+	#   the first /64 carved from the /48: fd13:37be:ef00::1.
+	# ip6assign=64 tells netifd to assign that /64 to br-lan.
+	uci -q set network.globals.ula_prefix='fd13:37be:ef00::/48'
+	uci -q set network.lan.ip6assign='64'
+	uci -q commit network
+
+	# DHCPv6 server + Router Advertisements with SLAAC so clients
+	# auto-configure their addresses from the advertised /64 prefix.
+	uci -q set dhcp.lan.dhcpv6='server'
+	uci -q set dhcp.lan.ra='server'
+	uci -q set dhcp.lan.ra_slaac='1'
+	uci -q commit dhcp
+
+	# eMMC data partition — mounted at /mnt/data, matched by GPT label.
 	DATA=$(uci add fstab mount)
 	uci set "fstab.${DATA}.label=data"
 	uci set "fstab.${DATA}.target=/mnt/data"
@@ -22,6 +43,22 @@ bodybytes,bodybytes)
 	uci set "fstab.${DATA}.options=noatime"
 	uci set "fstab.${DATA}.enabled=1"
 	uci commit fstab
+
+	# TLS certificate for uhttpd (LuCI HTTPS).
+	# EC P-256 self-signed, valid 10 years. SANs cover all access paths:
+	#   DNS:bodybytes.local  — avahi/mDNS hostname (IPv4 and IPv6)
+	#   DNS:bodybytes        — short hostname
+	#   IP:192.168.1.1       — fixed IPv4 gateway
+	#   IP:fd13:37be:ef00::1 — fixed ULA router address (see above)
+	# uhttpd (START=80) has already generated a generic cert by the time
+	# this script runs (START=95); overwrite it and restart to pick up ours.
+	openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
+		-keyout /etc/uhttpd.key -out /etc/uhttpd.crt \
+		-days 3650 -nodes -sha256 \
+		-subj "/C=US/O=Bodybytes/CN=bodybytes.local" \
+		-addext "subjectAltName=DNS:bodybytes.local,DNS:bodybytes,IP:192.168.1.1,IP:fd13:37be:ef00::1" \
+		-addext "extendedKeyUsage=serverAuth"
+	/etc/init.d/uhttpd restart
 
 	if [ -f /etc/config/samba4 ]; then
 		uci -q set samba4.@samba[0].description='Bodybytes'
