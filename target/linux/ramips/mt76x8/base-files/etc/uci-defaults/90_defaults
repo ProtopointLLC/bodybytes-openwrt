@@ -1,0 +1,26 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+board=$(board_name)
+
+case "$board" in
+bodybytes,bodybytes)
+	uci -q set system.@system[0].hostname='bodybytes'
+	uci -q commit system
+
+	uci -q set wireless.radio0.country='US'
+	uci -q set wireless.default_radio0.ssid='Bodybytes'
+	uci -q commit wireless
+
+	DATA=$(uci add fstab mount)
+	uci set "fstab.${DATA}.label=data"
+	uci set "fstab.${DATA}.target=/mnt/data"
+	uci set "fstab.${DATA}.fstype=ext4"
+	uci set "fstab.${DATA}.options=noatime"
+	uci set "fstab.${DATA}.enabled=1"
+	uci commit fstab
+	;;
+esac
+
+exit 0
