@@ -33,6 +33,24 @@ bodybytes,bodybytes)
 		uci set "samba4.${SHARE}.create_mask=0666"
 		uci set "samba4.${SHARE}.dir_mask=0777"
 		uci commit samba4
+
+		mkdir -p /etc/avahi/services
+		cat > /etc/avahi/services/smb.service << 'EOF'
+<?xml version="1.0" standalone='no'?><!--*-nxml-*-->
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">%h</name>
+  <service>
+    <type>_smb._tcp</type>
+    <port>445</port>
+  </service>
+  <service>
+    <type>_device-info._tcp</type>
+    <port>0</port>
+    <txt-record>model=RackMac</txt-record>
+  </service>
+</service-group>
+EOF
 	fi
 
 	if [ -f /etc/config/luci_statistics ]; then
@@ -48,7 +66,7 @@ bodybytes,bodybytes)
 		uci -q set luci_statistics.collectd_tcpconns.AllPortsSummary='1'
 		# Process tracking — key daemons
 		uci -q set luci_statistics.collectd_processes.enable='1'
-		uci -q set luci_statistics.collectd_processes.Processes='smbd nmbd dropbear uhttpd avahi-daemon collectd'
+		uci -q set luci_statistics.collectd_processes.Processes='smbd nmbd dnsmasq dropbear uhttpd avahi-daemon collectd'
 		# Persist RRD data on rootfs_data (via overlayfs) so history survives
 		# reboots without exposing it inside the Samba share on /mnt/data.
 		# /var is a tmpfs symlink in OpenWrt so /srv is used instead.
