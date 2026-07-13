@@ -79,17 +79,38 @@ define Device/alfa-network_awusfree1
 endef
 TARGET_DEVICES += alfa-network_awusfree1
 
+BODYBYTES_PACKAGES := kmod-mmc-mtk block-mount kmod-fs-ext4 uboot-envtools \
+  openssh-sftp-server rsync e2fsprogs avahi-daemon lsblk \
+  -wpad-basic-mbedtls wpad-openssl
+
 define Device/bodybytes_bodybytes
   DEVICE_VENDOR := Bodybytes
   DEVICE_MODEL := Bodybytes
-  IMAGE_SIZE := 120m
-  IMAGES := sysupgrade.bin recovery.bin
-  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
-  IMAGE/recovery.bin := append-image-stage initramfs-kernel.bin | check-size
-  DEVICE_PACKAGES := kmod-mmc-mtk block-mount kmod-fs-ext4 uboot-envtools parted
+  IMAGE_SIZE := 544m
+  IMAGES := sysupgrade.bin
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
+  DEVICE_PACKAGES := $(BODYBYTES_PACKAGES) \
+    samba4-server luci-app-samba4 \
+    luci-app-statistics \
+    collectd-mod-cpu collectd-mod-load collectd-mod-memory \
+    collectd-mod-disk collectd-mod-interface collectd-mod-iwinfo \
+    collectd-mod-tcpconns collectd-mod-processes \
+    iperf3 luci-app-ttyd luci-app-nlbwmon
   SUPPORTED_DEVICES := bodybytes,bodybytes
 endef
 TARGET_DEVICES += bodybytes_bodybytes
+
+define Device/bodybytes_bodybytes_recovery
+  DEVICE_VENDOR := Bodybytes
+  DEVICE_MODEL := Bodybytes
+  DEVICE_VARIANT := Recovery
+  IMAGE_SIZE := 65152k
+  IMAGES := recovery.bin
+  IMAGE/recovery.bin := append-image-stage initramfs-kernel.bin | check-size
+  DEVICE_PACKAGES := $(BODYBYTES_PACKAGES) parted
+  SUPPORTED_DEVICES := bodybytes,bodybytes
+endef
+TARGET_DEVICES += bodybytes_bodybytes_recovery
 
 define Device/asus_rt-ac1200
   IMAGE_SIZE := 16064k
