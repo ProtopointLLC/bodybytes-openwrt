@@ -11,6 +11,8 @@ bodybytes,bodybytes)
 
 	uci -q set wireless.radio0.country='US'
 	uci -q set wireless.default_radio0.ssid='Bodybytes'
+	uci -q set wireless.default_radio0.encryption='sae-mixed'
+	uci -q set wireless.default_radio0.key='bodybytes'
 	uci -q commit wireless
 
 	DATA=$(uci add fstab mount)
@@ -20,6 +22,39 @@ bodybytes,bodybytes)
 	uci set "fstab.${DATA}.options=noatime"
 	uci set "fstab.${DATA}.enabled=1"
 	uci commit fstab
+
+	if [ -f /etc/config/samba4 ]; then
+		uci -q set samba4.@samba[0].description='Bodybytes'
+		SHARE=$(uci add samba4 sambashare)
+		uci set "samba4.${SHARE}.name=data"
+		uci set "samba4.${SHARE}.path=/mnt/data"
+		uci set "samba4.${SHARE}.read_only=no"
+		uci set "samba4.${SHARE}.guest_ok=yes"
+		uci set "samba4.${SHARE}.create_mask=0666"
+		uci set "samba4.${SHARE}.dir_mask=0777"
+		uci commit samba4
+	fi
+
+	if [ -f /etc/config/luci_statistics ]; then
+		# Disk I/O — monitor eMMC
+		uci -q set luci_statistics.collectd_disk.enable='1'
+		uci -q set luci_statistics.collectd_disk.Disks='mmcblk0'
+		uci -q set luci_statistics.collectd_disk.IgnoreSelected='0'
+		# TCP connections — SSH and SMB
+		uci -q set luci_statistics.collectd_tcpconns.enable='1'
+		uci -q delete luci_statistics.collectd_tcpconns.LocalPorts
+		uci -q add_list luci_statistics.collectd_tcpconns.LocalPorts='22'
+		uci -q add_list luci_statistics.collectd_tcpconns.LocalPorts='445'
+		uci -q set luci_statistics.collectd_tcpconns.AllPortsSummary='1'
+		# Process tracking — key daemons
+		uci -q set luci_statistics.collectd_processes.enable='1'
+		uci -q set luci_statistics.collectd_processes.Processes='smbd nmbd dropbear uhttpd avahi-daemon collectd'
+		# Persist RRD data on rootfs_data (via overlayfs) so history survives
+		# reboots without exposing it inside the Samba share on /mnt/data.
+		# /var is a tmpfs symlink in OpenWrt so /srv is used instead.
+		uci -q set luci_statistics.collectd_rrdtool.DataDir='/srv/collectd/rrd'
+		uci commit luci_statistics
+	fi
 	;;
 esac
 
