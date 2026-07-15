@@ -1,3 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR MIT
 
 #include "mt7628an_bodybytes_bodybytes.dtsi"
+
+/ {
+	chosen {
+		bootargs = "console=ttyS2,115200 root=/dev/mmcblk0p2 rootwait";
+	};
+};
