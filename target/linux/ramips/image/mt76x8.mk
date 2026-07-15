@@ -87,6 +87,8 @@ BODYBYTES_PACKAGES := kmod-mmc-mtk block-mount kmod-fs-ext4 uboot-envtools \
 define Device/bodybytes_bodybytes
   DEVICE_VENDOR := Bodybytes
   DEVICE_MODEL := Bodybytes
+  DEVICE_DTS := mt7628an_bodybytes_bodybytes
+  KERNEL := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
   IMAGE_SIZE := 544m
   IMAGES := sysupgrade.bin
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
@@ -105,6 +107,8 @@ define Device/bodybytes_bodybytes_recovery
   DEVICE_VENDOR := Bodybytes
   DEVICE_MODEL := Bodybytes
   DEVICE_VARIANT := Recovery
+  DEVICE_DTS := mt7628an_bodybytes_bodybytes_recovery
+  KERNEL := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
   IMAGE_SIZE := 65152k
   IMAGES := recovery.bin
   IMAGE/recovery.bin := append-image-stage initramfs-kernel.bin | check-size
