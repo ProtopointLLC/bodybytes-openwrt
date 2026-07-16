@@ -17,7 +17,7 @@
 	};
 
 	chosen {
-		bootargs = "console=ttyS2,115200";
+		bootargs = "console=ttyS0,115200";
 	};
 };
 
@@ -114,6 +114,14 @@
 };
 
 / {
+	reg_3v3: regulator-3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
 	/*
 	 * Boot mode selector: TI DRV5032FCDBZT hall-effect sensor on MDI_TP_P1
 	 * (SoC pin 43, GPIO#14, active-low).  Low = magnet present = recovery
@@ -138,9 +146,17 @@
 &sdhci {
 	status = "okay";
 
+	vmmc-supply = <&reg_3v3>;
+	vqmmc-supply = <&reg_3v3>;
+	no-1-8-v;
+
 	pinctrl-0 = <&sdxc_iot_mode &mdi_p1_gpio>;
 
 	mediatek,cd-poll;
+};
+
+&uartlite {
+	status = "disabled";
 };
 
 &uart2 {
