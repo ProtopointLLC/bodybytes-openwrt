@@ -6,6 +6,9 @@ board=$(board_name)
 
 case "$board" in
 bodybytes,bodybytes)
+	# Root password
+	printf 'bodybytes\nbodybytes\n' | passwd root
+
 	# Hostname
 	uci -q set system.@system[0].hostname='bodybytes'
 	uci -q commit system
@@ -66,10 +69,15 @@ bodybytes,bodybytes)
 		uci set "samba4.${SHARE}.name=data"
 		uci set "samba4.${SHARE}.path=/mnt/data"
 		uci set "samba4.${SHARE}.read_only=no"
-		uci set "samba4.${SHARE}.guest_ok=yes"
+		uci set "samba4.${SHARE}.guest_ok=no"
+		uci set "samba4.${SHARE}.valid_users=bodybytes"
 		uci set "samba4.${SHARE}.create_mask=0666"
 		uci set "samba4.${SHARE}.dir_mask=0777"
 		uci commit samba4
+
+		# Create system user and Samba password for share access.
+		adduser -D -H -s /bin/false bodybytes 2>/dev/null || true
+		printf 'bodybytes\nbodybytes\n' | smbpasswd -a -s bodybytes
 	fi
 
 	if [ -f /etc/config/luci_statistics ]; then
