@@ -24,8 +24,6 @@
 /*
  * SPI NOR: W25Q512JV, 64 MB, CS0, 25 MHz.
  * NOR holds only the bootloader and WiFi EEPROM; the OS lives on eMMC.
- * W25Q512JV supports native 4-byte addressing; the MTD spi-nor driver
- * enters this mode on probe via command 0xB7 (no BAR required).
  */
 &spi0 {
 	status = "okay";
@@ -49,6 +47,7 @@
 			partition@40000 {
 				label = "u-boot-env";
 				reg = <0x40000 0x10000>;
+				read-only;
 			};
 
 			factory: partition@50000 {
