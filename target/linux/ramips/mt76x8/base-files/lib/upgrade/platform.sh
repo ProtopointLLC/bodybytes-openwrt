@@ -5,11 +5,40 @@
 PART_NAME=firmware
 REQUIRE_IMAGE_METADATA=1
 
-RAMFS_COPY_BIN='fw_printenv fw_setenv'
+RAMFS_COPY_BIN='fw_printenv fw_setenv devmem'
 RAMFS_COPY_DATA='/etc/fw_env.config /var/lock/fw_printenv.lock'
 
 platform_check_image() {
+	case "$(board_name)" in
+	bodybytes,bodybytes)
+		local gz part_name part_dev
+
+		[ "$(identify_magic_long "$(get_magic_long "$1" cat)")" = "gzip" ] && gz="z"
+
+		tar t${gz}f "$1" 2>/dev/null | grep -q "sysupgrade-.*/CONTROL" || {
+			echo "Not a sysupgrade tar archive"
+			return 1
+		}
+
+		for part_name in "kernel" "rootfs"; do
+			part_dev="$(find_mmc_part "$part_name")"
+			[ -n "$part_dev" ] || {
+				echo "eMMC partition \"$part_name\" not found"
+				return 1
+			}
+		done
+		;;
+	esac
+
 	return 0
+}
+
+platform_copy_config() {
+	case "$(board_name)" in
+	bodybytes,bodybytes)
+		emmc_copy_config
+		;;
+	esac
 }
 
 platform_do_upgrade() {
@@ -20,9 +49,7 @@ platform_do_upgrade() {
 		CI_KERNPART="kernel"
 		CI_ROOTPART="rootfs"
 		CI_DATAPART="rootfs_data"
-		fw_setenv upgrade_available 1
-		fw_setenv bootcount 0
-		fw_setenv bootlimit 3
+		devmem 0x1000006c 32 0xB0010000
 		emmc_do_upgrade "$1"
 		;;
 	alfa-network,awusfree1)
