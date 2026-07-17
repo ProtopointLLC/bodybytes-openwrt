@@ -82,6 +82,7 @@ TARGET_DEVICES += alfa-network_awusfree1
 BODYBYTES_PACKAGES := kmod-mmc-mtk block-mount kmod-fs-ext4 uboot-envtools \
   openssh-sftp-server rsync e2fsprogs avahi-daemon lsblk dtc \
   -wpad-basic-mbedtls wpad-openssl \
+  -swconfig \
   luci-ssl-openssl
 
 define Device/bodybytes_bodybytes
