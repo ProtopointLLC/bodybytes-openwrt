@@ -8,6 +8,9 @@ ramips_setup_interfaces()
 	local board="$1"
 
 	case $board in
+	bodybytes,bodybytes)
+		ucidef_set_interface "lan" protocol "static"
+		;;
 	7links,wlr-1230|\
 	7links,wlr-1240|\
 	alfa-network,awusfree1|\
