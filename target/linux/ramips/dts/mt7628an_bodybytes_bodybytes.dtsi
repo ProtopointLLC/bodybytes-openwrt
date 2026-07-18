@@ -75,6 +75,20 @@
 	};
 };
 
+&state_default {
+	/*
+	 * SPIS_MODE=gpio: converts MDI P1 pads to GPIO#14-17.
+	 * Applied as the system default so both consumers are covered at
+	 * pinctrl init time rather than waiting for sdhci probe:
+	 *   - GPIO#14 (MDI_TP_P1): boot-mode hall sensor (gpio-keys)
+	 *   - GPIO#15 (MDI_TN_P1): eMMC RST_n (mmc-pwrseq-emmc)
+	 */
+	spis_gpio {
+		groups = "spis";
+		function = "gpio";
+	};
+};
+
 &pinctrl {
 	/*
 	 * ephy-digital: sets AGPIO_CFG EPHY_GPIO_AIO_EN[4:1]=0xf so all
@@ -97,17 +111,6 @@
 		sdxc {
 			groups = "sdmode";
 			function = "sdxc";
-		};
-	};
-
-	/*
-	 * mdi_p1_gpio: SPIS_MODE=gpio -> MDI P1 pads become GPIO#14-17.
-	 * Required so GPIO#14 (MDI_TP_P1) is readable as the boot-mode key.
-	 */
-	mdi_p1_gpio: mdi_p1_gpio {
-		spis_gpio {
-			groups = "spis";
-			function = "gpio";
 		};
 	};
 };
@@ -139,8 +142,11 @@
 };
 
 /*
- * SD card: removable, connected on EPHY MDI P3/P4 pads via sdxc_iot_mode.
- * mediatek,cd-poll enables kernel polling for card insertion/removal.
+ * eMMC / microSD on EPHY MDI P3/P4 pads via sdxc_iot_mode.
+ * no-sdio: skip CMD5 SDIO probe.  Without it the MSDC driver sets
+ * SDC_CFG_SDIO in hardware; CMD5 then causes "no support for card's
+ * volts" and leaves the card stuck busy for CMD1.
+ * non-removable: card is always present; no CD polling needed.
  */
 &sdhci {
 	status = "okay";
@@ -148,10 +154,10 @@
 	vmmc-supply = <&reg_3v3>;
 	vqmmc-supply = <&reg_3v3>;
 	no-1-8-v;
+	no-sdio;
+	non-removable;
 
-	pinctrl-0 = <&sdxc_iot_mode &mdi_p1_gpio>;
-
-	mediatek,cd-poll;
+	pinctrl-0 = <&sdxc_iot_mode>;
 };
 
 &uartlite {
