@@ -80,10 +80,9 @@ endef
 TARGET_DEVICES += alfa-network_awusfree1
 
 BODYBYTES_PACKAGES := kmod-mmc-mtk block-mount kmod-fs-ext4 uboot-envtools \
-  openssh-sftp-server rsync e2fsprogs avahi-daemon lsblk dtc \
-  -wpad-basic-mbedtls wpad-openssl \
-  -swconfig \
-  luci-ssl-openssl
+  openssh-sftp-server rsync e2fsprogs avahi-daemon lsblk dtc iperf3 \
+  -swconfig -wpad-basic-mbedtls wpad-openssl \
+  luci-ssl-openssl luci-app-ttyd
 
 define Device/bodybytes_bodybytes
   DEVICE_VENDOR := Bodybytes
@@ -95,11 +94,10 @@ define Device/bodybytes_bodybytes
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
   DEVICE_PACKAGES := $(BODYBYTES_PACKAGES) \
     samba4-server luci-app-samba4 \
-    luci-app-statistics \
+    luci-app-statistics luci-app-nlbwmon \
     collectd-mod-cpu collectd-mod-load collectd-mod-memory \
     collectd-mod-disk collectd-mod-interface collectd-mod-iwinfo \
-    collectd-mod-tcpconns collectd-mod-processes \
-    iperf3 luci-app-ttyd luci-app-nlbwmon
+    collectd-mod-tcpconns collectd-mod-processes
   SUPPORTED_DEVICES := bodybytes,bodybytes
 endef
 TARGET_DEVICES += bodybytes_bodybytes
