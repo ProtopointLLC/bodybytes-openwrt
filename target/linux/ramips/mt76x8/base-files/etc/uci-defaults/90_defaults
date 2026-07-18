@@ -13,8 +13,7 @@ bodybytes,bodybytes)
 	uci -q set system.@system[0].hostname='bodybytes'
 	uci -q commit system
 
-	# WiFi — WPA3/WPA2 mixed (sae-mixed), US regulatory domain.
-	# Change the key via LuCI before deploying.
+	# WiFi — WPA3/WPA2 mixed, US region
 	uci -q set wireless.radio0.country='US'
 	uci -q set wireless.default_radio0.ssid='Bodybytes'
 	uci -q set wireless.default_radio0.encryption='sae-mixed'
@@ -22,24 +21,27 @@ bodybytes,bodybytes)
 	uci -q set wireless.default_radio0.disabled='0'
 	uci -q commit wireless
 
-	# IPv4: 192.168.1.1/24 (OpenWrt default, set by config_generate).
-	# IPv6: fixed ULA prefix fd13:37be:ef00::/48 ("1337beef").
-	#   A fixed prefix is safe because bodybytes is an isolated AP — no other
-	#   device will ever share this ULA space. The router address is ::1 of
-	#   the first /64 carved from the /48: fd13:37be:ef00::1.
-	# ip6assign=64 tells netifd to assign that /64 to br-lan.
-	uci -q set network.globals.ula_prefix='fd13:37be:ef00::/48'
-	uci -q set network.lan.ip6assign='64'
-	uci -q commit network
+	# IPv4: 192.168.1.1/24
+	# IPv6: fixed ULA prefix fd13:37be:ef00::/48
+	BRDEV=$(uci add network device)
+	uci set "network.${BRDEV}.name=br-lan"
+	uci set "network.${BRDEV}.type=bridge"
+	uci set network.lan=interface
+	uci set network.lan.device='br-lan'
+	uci set network.lan.proto='static'
+	uci add_list network.lan.ipaddr='192.168.1.1/24'
+	uci set network.lan.ip6assign='64'
+	uci set network.globals.ula_prefix='fd13:37be:ef00::/48'
+	uci commit network
 
-	# DHCPv6 server + Router Advertisements with SLAAC so clients
-	# auto-configure their addresses from the advertised /64 prefix.
+	# DHCPv6 + RA with SLAAC.
 	uci -q set dhcp.lan.dhcpv6='server'
 	uci -q set dhcp.lan.ra='server'
 	uci -q set dhcp.lan.ra_slaac='1'
 	uci -q commit dhcp
 
-	# eMMC data partition — mounted at /mnt/data, matched by GPT label.
+	# eMMC/SD data partition at /mnt/data.
+	uci -q set fstab.@global[0].delay_root='5'
 	DATA=$(uci add fstab mount)
 	uci set "fstab.${DATA}.label=data"
 	uci set "fstab.${DATA}.target=/mnt/data"
@@ -48,20 +50,31 @@ bodybytes,bodybytes)
 	uci set "fstab.${DATA}.enabled=1"
 	uci commit fstab
 
-	# TLS certificate for uhttpd (LuCI HTTPS).
-	# EC P-256 self-signed, valid 10 years. SANs cover all access paths:
-	#   DNS:bodybytes.local  — avahi/mDNS hostname (IPv4 and IPv6)
-	#   DNS:bodybytes        — short hostname
-	#   IP:192.168.1.1       — fixed IPv4 gateway
-	#   IP:fd13:37be:ef00::1 — fixed ULA router address (see above)
-	# uhttpd (START=80) has already generated a generic cert by the time
-	# this script runs (START=95); overwrite it and restart to pick up ours.
+	# TLS PKI — CA + signed server cert
+	[ "$(date +%Y)" -lt 2025 ] && date -s "2026-01-01 00:00:00"
 	openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
-		-keyout /etc/uhttpd.key -out /etc/uhttpd.crt \
-		-days 3650 -nodes -sha256 \
-		-subj "/C=US/O=Bodybytes/CN=bodybytes.local" \
-		-addext "subjectAltName=DNS:bodybytes.local,DNS:bodybytes,IP:192.168.1.1,IP:fd13:37be:ef00::1" \
-		-addext "extendedKeyUsage=serverAuth"
+		-keyout /etc/bodybytes-ca.key -out /etc/bodybytes-ca.crt \
+		-days 18250 -nodes -sha256 \
+		-subj "/C=US/O=Bodybytes/CN=Bodybytes CA" \
+		-addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+		-addext "keyUsage=critical,keyCertSign,cRLSign"
+	openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
+		-keyout /etc/uhttpd.key -out /tmp/uhttpd.csr \
+		-nodes -sha256 \
+		-subj "/C=US/O=Bodybytes/CN=bodybytes.local"
+	printf 'subjectAltName=DNS:bodybytes.local,DNS:bodybytes,IP:192.168.1.1,IP:fd13:37be:ef00::1\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n' \
+		> /tmp/uhttpd-ext.cnf
+	openssl x509 -req \
+		-in /tmp/uhttpd.csr \
+		-CA /etc/bodybytes-ca.crt -CAkey /etc/bodybytes-ca.key -CAcreateserial \
+		-out /etc/uhttpd.crt \
+		-days 18250 -sha256 \
+		-extfile /tmp/uhttpd-ext.cnf
+	cat /etc/bodybytes-ca.crt >> /etc/uhttpd.crt
+	rm /tmp/uhttpd.csr /tmp/uhttpd-ext.cnf /etc/bodybytes-ca.srl 2>/dev/null
+	cp /etc/bodybytes-ca.crt /www/bodybytes-ca.crt
+	uci -q set uhttpd.main.redirect_https='1'
+	uci -q commit uhttpd
 	/etc/init.d/uhttpd restart
 
 	if [ -f /etc/config/samba4 ]; then
@@ -76,28 +89,27 @@ bodybytes,bodybytes)
 		uci set "samba4.${SHARE}.dir_mask=0777"
 		uci commit samba4
 
-		# Create system user and Samba password for share access.
 		adduser -D -H -s /bin/false bodybytes 2>/dev/null || true
 		printf 'bodybytes\nbodybytes\n' | smbpasswd -a -s bodybytes
 	fi
 
+	uci -q set ttyd.@ttyd[0].ssl='1'
+	uci -q set ttyd.@ttyd[0].ssl_cert='/etc/uhttpd.crt'
+	uci -q set ttyd.@ttyd[0].ssl_key='/etc/uhttpd.key'
+	uci -q set ttyd.@ttyd[0].ipv6='1'
+	uci -q commit ttyd
+
 	if [ -f /etc/config/luci_statistics ]; then
-		# Disk I/O — monitor eMMC
 		uci -q set luci_statistics.collectd_disk.enable='1'
 		uci -q set luci_statistics.collectd_disk.Disks='mmcblk0'
 		uci -q set luci_statistics.collectd_disk.IgnoreSelected='0'
-		# TCP connections — SSH and SMB
 		uci -q set luci_statistics.collectd_tcpconns.enable='1'
 		uci -q delete luci_statistics.collectd_tcpconns.LocalPorts
 		uci -q add_list luci_statistics.collectd_tcpconns.LocalPorts='22'
 		uci -q add_list luci_statistics.collectd_tcpconns.LocalPorts='445'
 		uci -q set luci_statistics.collectd_tcpconns.AllPortsSummary='1'
-		# Process tracking — key daemons
 		uci -q set luci_statistics.collectd_processes.enable='1'
 		uci -q set luci_statistics.collectd_processes.Processes='smbd nmbd dnsmasq dropbear uhttpd avahi-daemon collectd'
-		# Persist RRD data on rootfs_data (via overlayfs) so history survives
-		# reboots without exposing it inside the Samba share on /mnt/data.
-		# /var is a tmpfs symlink in OpenWrt so /srv is used instead.
 		uci -q set luci_statistics.collectd_rrdtool.DataDir='/srv/collectd/rrd'
 		uci commit luci_statistics
 	fi
