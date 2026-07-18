@@ -143,10 +143,12 @@
 
 /*
  * eMMC / microSD on EPHY MDI P3/P4 pads via sdxc_iot_mode.
- * no-sdio: skip CMD5 SDIO probe.  Without it the MSDC driver sets
- * SDC_CFG_SDIO in hardware; CMD5 then causes "no support for card's
- * volts" and leaves the card stuck busy for CMD1.
+ * no-sdio: skip CMD5 SDIO probe; without it the MSDC driver sets
+ * SDC_CFG_SDIO and CMD5 causes "no support for card's volts".
  * non-removable: card is always present; no CD polling needed.
+ * SD (ACMD41) probe is intentionally left enabled so a microSD card
+ * works without any DTS change; the driver falls through to CMD1 (MMC)
+ * automatically when ACMD41 times out.
  */
 &sdhci {
 	status = "okay";
@@ -192,4 +194,8 @@
 	 * property and copies the eFuse wholesale instead.
 	 */
 	mediatek,eeprom-merge-otp;
+
+	led {
+		status = "disabled";
+	};
 };
