@@ -4,6 +4,6 @@
 
 / {
 	chosen {
-		bootargs = "console=ttyS2,115200 root=/dev/mmcblk0p2 rootwait";
+		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rootwait";
 	};
 };
