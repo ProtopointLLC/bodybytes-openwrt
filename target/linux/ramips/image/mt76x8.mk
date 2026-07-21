@@ -93,6 +93,7 @@ define Device/bodybytes_bodybytes
   IMAGES := sysupgrade.bin
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size
   DEVICE_PACKAGES := $(BODYBYTES_PACKAGES) \
+    travelmate luci-app-travelmate \
     samba4-server luci-app-samba4 \
     luci-app-statistics luci-app-nlbwmon \
     collectd-mod-cpu collectd-mod-load collectd-mod-memory \

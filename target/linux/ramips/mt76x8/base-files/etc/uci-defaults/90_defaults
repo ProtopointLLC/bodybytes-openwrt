@@ -9,11 +9,12 @@ bodybytes,bodybytes)
 	# Root password
 	printf 'bodybytes\nbodybytes\n' | passwd root
 
-	# Hostname
+	# Hostname and syslog to UART
 	uci -q set system.@system[0].hostname='bodybytes'
+	uci -q set system.@system[0].log_file='/dev/console'
 	uci -q commit system
 
-	# WiFi — WPA3/WPA2 mixed, US region
+	# WiFi - WPA3/WPA2 mixed, US region
 	uci -q set wireless.radio0.country='US'
 	uci -q set wireless.default_radio0.ssid='Bodybytes'
 	uci -q set wireless.default_radio0.encryption='sae-mixed'
@@ -39,6 +40,39 @@ bodybytes,bodybytes)
 	uci -q set dhcp.lan.ra='server'
 	uci -q set dhcp.lan.ra_slaac='1'
 	uci -q commit dhcp
+
+	# Travelmate AP+STA management
+	if [ -x /etc/init.d/travelmate ]; then
+		uci -q set travelmate.global.trm_enabled='1'
+		uci -q set travelmate.global.trm_iface='trm_wwan'
+		uci -q set travelmate.global.trm_radio='radio0'
+		uci -q set travelmate.global.trm_captive='1'
+		uci -q set travelmate.global.trm_proactive='1'
+		uci -q set travelmate.global.trm_netcheck='1'
+		uci -q commit travelmate
+
+		# trm_wwan: DHCP uplink interface managed by travelmate
+		uci -q set network.trm_wwan='interface'
+		uci -q set network.trm_wwan.proto='dhcp'
+		uci -q set network.trm_wwan.metric='100'
+		uci -q set network.trm_wwan6='interface'
+		uci -q set network.trm_wwan6.device='@trm_wwan'
+		uci -q set network.trm_wwan6.proto='dhcpv6'
+		uci -q commit network
+
+		# Add trm_wwan to wan firewall zone
+		_cnt=0
+		while uci -q get "firewall.@zone[${_cnt}]" >/dev/null 2>&1; do
+			if [ "$(uci -q get "firewall.@zone[${_cnt}].name")" = 'wan' ]; then
+				uci -q add_list "firewall.@zone[${_cnt}].network"='trm_wwan'
+				uci -q add_list "firewall.@zone[${_cnt}].network"='trm_wwan6'
+				break
+			fi
+			_cnt=$((_cnt + 1))
+		done
+		uci -q commit firewall
+		/etc/init.d/travelmate enable
+	fi
 
 	# eMMC/SD data partition at /mnt/data.
 	uci -q set fstab.@global[0].delay_root='5'
