@@ -12,12 +12,14 @@ define KernelPackage/mmc-mtk
 	CONFIG_MMC \
 	CONFIG_MMC_CQHCI \
 	CONFIG_MMC_HSQ \
-	CONFIG_MMC_MTK
+	CONFIG_MMC_MTK \
+	CONFIG_PWRSEQ_EMMC
   FILES:= \
+	$(LINUX_DIR)/drivers/mmc/core/pwrseq_emmc.ko \
 	$(LINUX_DIR)/drivers/mmc/host/cqhci.ko \
 	$(LINUX_DIR)/drivers/mmc/host/mmc_hsq.ko \
 	$(LINUX_DIR)/drivers/mmc/host/mtk-sd.ko
-  AUTOLOAD:=$(call AutoProbe,cqhci mmc_hsq mtk-sd,1)
+  AUTOLOAD:=$(call AutoProbe,pwrseq_emmc cqhci mmc_hsq mtk-sd,1)
 endef
 
 define KernelPackage/mmc-mtk/description
