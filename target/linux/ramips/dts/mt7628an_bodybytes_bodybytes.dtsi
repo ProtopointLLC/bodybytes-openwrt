@@ -11,8 +11,8 @@
 	compatible = "bodybytes,bodybytes", "mediatek,mt7628an-soc";
 	model = "Bodybytes";
 
-	memory@0 { 
-		device_type = "memory"; 
+	memory@0 {
+		device_type = "memory";
 		reg = <0x00000000 0x04000000>;
 	};
 
@@ -21,10 +21,7 @@
 	};
 };
 
-/*
- * SPI NOR: W25Q512JV, 64 MB, CS0, 25 MHz.
- * NOR holds only the bootloader and WiFi EEPROM; the OS lives on eMMC.
- */
+/* SPI NOR W25Q512JV, 64 MB: bootloader + WiFi EEPROM only; OS on eMMC. */
 &spi0 {
 	status = "okay";
 
@@ -77,11 +74,8 @@
 
 &state_default {
 	/*
-	 * SPIS_MODE=gpio: converts MDI P1 pads to GPIO#14-17.
-	 * Applied as the system default so both consumers are covered at
-	 * pinctrl init time rather than waiting for sdhci probe:
-	 *   - GPIO#14 (MDI_TP_P1): boot-mode hall sensor (gpio-keys)
-	 *   - GPIO#15 (MDI_TN_P1): eMMC RST_n (mmc-pwrseq-emmc)
+	 * MDI P1 pads → GPIO#14-17 at pinctrl init, before sdhci probes.
+	 * GPIO#14: boot-mode hall sensor; GPIO#15: eMMC RST_n.
 	 */
 	spis_gpio {
 		groups = "spis";
@@ -91,16 +85,17 @@
 
 &pinctrl {
 	/*
-	 * ephy-digital: sets AGPIO_CFG EPHY_GPIO_AIO_EN[4:1]=0xf so all
-	 * MDI P1-P4 pads operate as digital signals.  Required for:
-	 *   - SDXC on MDI P3/P4 (sdxc_iot_mode)
-	 *   - UART2 on MDI_P2 pads (UART2_MODE=0 from uart2_pins in dtsi)
+	 * AGPIO_CFG EPHY_GPIO_AIO_EN[4:1] = 0xf: all four EPHY groups digital.
+	 * P4 analog severs the MSDC digital path from CLK/CMD — no comms possible.
+	 * EPHY P4 input buffer loads CMD/CLK in idle, but push-pull command/response
+	 * phases (MSDC ~50Ω, card ~50Ω) easily overcome the ~500Ω EPHY load.
 	 */
 	ephy-digital;
 
 	/*
-	 * sdxc_iot_mode: AGPIO_CFG ESD bit -> iot (routes SDXC to EPHY pads),
-	 * GPIO_MODE SDMODE -> sdxc.
+	 * IoT SDXC routing: ESD mux → iot routes SDXC to MDI/EPHY pads.
+	 * This is the hardware reset default; setting it explicitly here for clarity.
+	 * EPHY digital mode is applied board-wide via ephy-digital above.
 	 */
 	sdxc_iot_mode: sdxc_iot_mode {
 		esd {
@@ -116,6 +111,11 @@
 };
 
 / {
+	emmc_pwrseq: emmc-pwrseq {
+		compatible = "mmc-pwrseq-emmc";
+		reset-gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
+	};
+
 	reg_3v3: regulator-3v3 {
 		compatible = "regulator-fixed";
 		regulator-name = "3v3";
@@ -125,10 +125,8 @@
 	};
 
 	/*
-	 * Boot mode selector: TI DRV5032FCDBZT hall-effect sensor on MDI_TP_P1
-	 * (SoC pin 43, GPIO#14, active-low).  Low = magnet present = recovery
-	 * boot (already selected by U-Boot before Linux starts).  Exposed here
-	 * so userspace can read current physical state via /dev/input/eventN.
+	 * TI DRV5032FCDBZT hall sensor, GPIO#14 (MDI_TP_P1), active-low.
+	 * Low = magnet = recovery boot. Exposes state to userspace via /dev/input.
 	 */
 	keys {
 		compatible = "gpio-keys";
@@ -141,28 +139,37 @@
 	};
 };
 
-/*
- * eMMC / microSD on EPHY MDI P3/P4 pads via sdxc_iot_mode.
- * no-sdio: skip CMD5 SDIO probe; without it the MSDC driver sets
- * SDC_CFG_SDIO and CMD5 causes "no support for card's volts".
- * non-removable: card is always present; no CD polling needed.
- * SD (ACMD41) probe is intentionally left enabled so a microSD card
- * works without any DTS change; the driver falls through to CMD1 (MMC)
- * automatically when ACMD41 times out.
- */
+/* SD/eMMC on SDXC/IoT pads. EPHY groups digital via &pinctrl ephy-digital. */
 &sdhci {
 	status = "okay";
 
-	vmmc-supply = <&reg_3v3>;
-	vqmmc-supply = <&reg_3v3>;
-	no-1-8-v;
+	pinctrl-names = "default", "state_uhs";
+	pinctrl-0 = <&sdxc_iot_mode>;
+	pinctrl-1 = <&sdxc_iot_mode>;
+
+	/* max-frequency = <48000000>; */
+	max-frequency = <1000000>;
+
 	no-sdio;
 	non-removable;
-
-	pinctrl-0 = <&sdxc_iot_mode>;
+	vmmc-supply = <&reg_3v3>;
+	vqmmc-supply = <&reg_3v3>;
+	mmc-pwrseq = <&emmc_pwrseq>;
 };
 
 &uartlite {
+	status = "disabled";
+};
+
+&usbphy {
+	status = "disabled";
+};
+
+&ehci {
+	status = "disabled";
+};
+
+&ohci {
 	status = "disabled";
 };
 
@@ -185,13 +192,9 @@
 	nvmem-cell-names = "eeprom";
 
 	/*
-	 * Merge on-chip eFuse RF calibration into the external EEPROM.
-	 * The eFuse (burned by MediaTek at wafer test) provides per-chip
-	 * TX power, RSSI offsets, and crystal trim. Without this, a custom
-	 * EEPROM with only a MAC address set would have zeroed RF fields
-	 * and the radio would use uncalibrated defaults.
-	 * If the external EEPROM is erased/invalid, the driver ignores this
-	 * property and copies the eFuse wholesale instead.
+	 * Merge eFuse RF calibration (TX power, RSSI offsets, crystal trim)
+	 * into the external EEPROM; without this, a custom EEPROM would use
+	 * uncalibrated RF defaults.
 	 */
 	mediatek,eeprom-merge-otp;
 
