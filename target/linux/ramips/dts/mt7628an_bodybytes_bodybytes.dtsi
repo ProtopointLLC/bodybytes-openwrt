@@ -147,8 +147,12 @@
 	pinctrl-0 = <&sdxc_iot_mode>;
 	pinctrl-1 = <&sdxc_iot_mode>;
 
-	/* max-frequency = <48000000>; */
-	max-frequency = <1000000>;
+	/*
+	 * SD/MMC High-Speed, 48 MHz (max at 3.3 V; HS200/400 need 1.8 V).
+	 * cap-sd-highspeed / cap-mmc-highspeed are inherited from mt7628an.dtsi.
+	 * Requires strap in GPIO/EPHY_LED mode (JTAG off) — JTAG breaks SD-on-EPHY.
+	 */
+	max-frequency = <48000000>;
 
 	no-sdio;
 	non-removable;
@@ -177,13 +181,13 @@
 	status = "okay";
 };
 
-&ethernet {
-	status = "disabled";
-};
-
-&esw {
-	status = "disabled";
-};
+/*
+ * No ethernet ports are wired, but the switch/PHY block is left enabled (its
+ * hardware-reset default) on purpose: probing it brings the EPHY out of its
+ * abnormal idle state, which the SD/eMMC pads (shared with EPHY P1-P4 in IoT
+ * mode) depend on to idle high. Disabling it leaves SD DAT0 stuck low.
+ * &ethernet and &esw are enabled by mt7628an.dtsi; do not override to disabled.
+ */
 
 &wmac {
 	status = "okay";
