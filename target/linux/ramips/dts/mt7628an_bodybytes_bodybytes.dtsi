@@ -148,11 +148,10 @@
 	pinctrl-1 = <&sdxc_iot_mode>;
 
 	/*
-	 * SD/MMC High-Speed, 48 MHz (max at 3.3 V; HS200/400 need 1.8 V).
-	 * cap-sd-highspeed / cap-mmc-highspeed are inherited from mt7628an.dtsi.
-	 * Requires strap in GPIO/EPHY_LED mode (JTAG off) — JTAG breaks SD-on-EPHY.
+	 * 26 MHz, not 48: EPHY pads are marginal; 48 MHz gave CMD-phase timeouts
+	 * escalating to "Card stuck busy" + I/O errors. Needs JTAG off (EPHY strap).
 	 */
-	max-frequency = <48000000>;
+	max-frequency = <26000000>;
 
 	no-sdio;
 	non-removable;
