@@ -148,10 +148,9 @@
 	pinctrl-1 = <&sdxc_iot_mode>;
 
 	/*
-	 * 26 MHz, not 48: EPHY pads are marginal; 48 MHz gave CMD-phase timeouts
-	 * escalating to "Card stuck busy" + I/O errors. Needs JTAG off (EPHY strap).
+	 * 26 MHz or 48 MHz: EPHY pads are marginal; 48 MHz needs tight wiring. Needs JTAG off (EPHY strap).
 	 */
-	max-frequency = <26000000>;
+	max-frequency = <48000000>;
 
 	no-sdio;
 	non-removable;
