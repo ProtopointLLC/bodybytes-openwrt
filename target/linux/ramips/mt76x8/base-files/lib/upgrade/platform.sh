@@ -51,6 +51,7 @@ platform_do_upgrade() {
 		CI_DATAPART="rootfs_data"
 		devmem 0x1000006c 32 0xB0010000
 		emmc_do_upgrade "$1"
+		sync
 		;;
 	alfa-network,awusfree1)
 		[ "$(fw_printenv -n dual_image 2>/dev/null)" = "1" ] &&\
