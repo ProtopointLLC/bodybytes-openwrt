@@ -1,0 +1,13 @@
+#!/bin/sh /etc/rc.common
+# Boot-time TRIM: no RTC and on-demand power, so wall-clock cron can't fire.
+# The sleep lets very short sessions skip it; an interrupted run is harmless.
+
+START=99
+
+boot() {
+	case $(board_name) in
+	bodybytes,bodybytes)
+		( sleep 60; [ -x /usr/sbin/fstrim ] && fstrim -a ) &
+		;;
+	esac
+}
