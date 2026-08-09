@@ -1,0 +1,18 @@
+# Restart avahi when the LAN interface gains/updates its addresses, so it
+# re-probes with both IPv4 and IPv6 and does not rename itself to <host>-2.
+
+. /lib/functions.sh
+
+board=$(board_name)
+
+case "$board" in
+bodybytes,bodybytes)
+	[ "$INTERFACE" = "lan" ] || exit 0
+
+	case "$ACTION" in
+	ifup|ifupdate)
+		[ -x /etc/init.d/avahi-daemon ] && /etc/init.d/avahi-daemon restart
+		;;
+	esac
+	;;
+esac
