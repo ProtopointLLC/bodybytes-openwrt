@@ -1,0 +1,21 @@
+#!/bin/sh /etc/rc.common
+# Boot fallback for the hotplug re-probe: wait for the LAN global IPv6 to appear,
+# then restart avahi once so it publishes A and AAAA without renaming to <host>-2.
+
+START=99
+
+boot() {
+	case $(board_name) in
+	bodybytes,bodybytes)
+		(
+			i=0
+			while [ "$i" -lt 30 ]; do
+				ip -6 addr show dev br-lan 2>/dev/null | grep -q 'scope global' && break
+				sleep 1
+				i=$((i + 1))
+			done
+			/etc/init.d/avahi-daemon restart
+		) &
+		;;
+	esac
+}
