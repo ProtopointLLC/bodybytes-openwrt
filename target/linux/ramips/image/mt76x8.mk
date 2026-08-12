@@ -80,7 +80,7 @@ endef
 TARGET_DEVICES += alfa-network_awusfree1
 
 BODYBYTES_PACKAGES := block-mount kmod-fs-ext4 kmod-fs-f2fs mkf2fs f2fsck uboot-envtools \
-  openssh-sftp-server rsync e2fsprogs avahi-daemon lsblk mmc-utils blkdiscard fstrim dtc iperf3 fio \
+  openssh-sftp-server rsync e2fsprogs tune2fs resize2fs avahi-daemon lsblk mmc-utils blkdiscard fstrim dtc iperf3 fio \
   -swconfig -wpad-basic-mbedtls wpad-openssl \
   luci-ssl-openssl luci-app-ttyd
 
@@ -95,6 +95,7 @@ define Device/bodybytes_bodybytes
   DEVICE_PACKAGES := $(BODYBYTES_PACKAGES) \
     travelmate luci-app-travelmate \
     samba4-server luci-app-samba4 \
+    dufs luci-app-dufs \
     luci-app-statistics \
     collectd-mod-cpu collectd-mod-load collectd-mod-memory \
     collectd-mod-disk collectd-mod-interface collectd-mod-iwinfo \

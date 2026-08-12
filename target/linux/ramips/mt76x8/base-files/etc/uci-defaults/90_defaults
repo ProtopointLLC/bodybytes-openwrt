@@ -22,6 +22,7 @@ bodybytes,bodybytes)
 
 	# WiFi - WPA3/WPA2 mixed, US region
 	uci -q set wireless.radio0.country='US'
+	uci -q set wireless.radio0.channel='auto'
 	uci -q set wireless.default_radio0.ssid='Bodybytes'
 	uci -q set wireless.default_radio0.encryption='sae-mixed'
 	uci -q set wireless.default_radio0.key='bodybytes'
@@ -49,7 +50,14 @@ bodybytes,bodybytes)
 
 	# Travelmate uplink
 	if [ -x /etc/init.d/travelmate ]; then
+		uci -q set travelmate.global.trm_enabled='1'
+		uci -q commit travelmate
 		/etc/init.d/travelmate enable
+		/etc/init.d/travelmate setup trm_wwan wan 100
+		/etc/init.d/travelmate stop
+		rm -f /var/run/travelmate/travelmate.runtime.json /var/run/travelmate/travelmate.pid
+		uci -q set travelmate.global.trm_enabled='0'
+		uci -q commit travelmate
 	fi
 
 	# Standard user (uid/gid 8000), owns the data partition
@@ -105,6 +113,7 @@ bodybytes,bodybytes)
 		uci set "samba4.${SHARE}.users=bodybytes"
 		uci set "samba4.${SHARE}.create_mask=0666"
 		uci set "samba4.${SHARE}.dir_mask=0777"
+		uci set "samba4.${SHARE}.force_root=1"
 		uci commit samba4
 
 		if [ -f /etc/samba/smb.conf.template ]; then
@@ -122,6 +131,21 @@ bodybytes,bodybytes)
 	uci -q set ttyd.@ttyd[0].ssl_key='/etc/uhttpd.key'
 	uci -q set ttyd.@ttyd[0].ipv6='1'
 	uci -q commit ttyd
+
+	# dufs web file server: /public (anonymous rw) and /protected (bodybytes rw)
+	if [ -f /etc/config/dufs ]; then
+		uci -q set dufs.config.enabled='1'
+		uci -q set dufs.config.serve_path='/mnt/data'
+		uci -q set dufs.config.tls_cert='/etc/uhttpd.crt'
+		uci -q set dufs.config.tls_key='/etc/uhttpd.key'
+		uci -q set dufs.config.allow_upload='1'
+		uci -q set dufs.config.allow_delete='1'
+		uci -q set dufs.config.allow_search='1'
+		uci -q delete dufs.config.auth
+		uci -q add_list dufs.config.auth='bodybytes:bodybytes@/protected:rw'
+		uci -q add_list dufs.config.auth='@/public:rw'
+		uci -q commit dufs
+	fi
 
 	# Configure statistics collector
 	if [ -f /etc/config/luci_statistics ]; then
