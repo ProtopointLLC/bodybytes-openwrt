@@ -48,9 +48,12 @@ bodybytes,bodybytes)
 	uci -q set dhcp.lan.ra_slaac='1'
 	uci -q commit dhcp
 
-	# Travelmate uplink
+	# Travelmate uplink, one bounded attempt per boot via native trm_oneshot/trm_ifdown_disable
 	if [ -x /etc/init.d/travelmate ]; then
 		uci -q set travelmate.global.trm_enabled='1'
+		uci -q set travelmate.global.trm_minquality='1'
+		uci -q set travelmate.global.trm_oneshot='1'
+		uci -q set travelmate.global.trm_ifdown_disable='1'
 		uci -q commit travelmate
 		/etc/init.d/travelmate enable
 		/etc/init.d/travelmate setup trm_wwan wan 100
