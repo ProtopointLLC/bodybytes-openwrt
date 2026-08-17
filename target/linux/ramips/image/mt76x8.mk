@@ -79,8 +79,10 @@ define Device/alfa-network_awusfree1
 endef
 TARGET_DEVICES += alfa-network_awusfree1
 
-BODYBYTES_PACKAGES := block-mount kmod-fs-ext4 kmod-fs-f2fs mkf2fs f2fsck uboot-envtools \
-  openssh-sftp-server rsync e2fsprogs tune2fs resize2fs avahi-daemon lsblk mmc-utils blkdiscard fstrim dtc iperf3 fio \
+BODYBYTES_PACKAGES := bodybytes-common uboot-envtools avahi-daemon openssl-util \
+  block-mount kmod-fs-ext4 kmod-fs-f2fs mkf2fs f2fsck e2fsprogs tune2fs resize2fs \
+  lsblk mmc-utils blkdiscard fstrim \
+  openssh-sftp-server rsync dtc iperf3 fio \
   -swconfig -wpad-basic-mbedtls wpad-openssl \
   luci-ssl-openssl luci-app-ttyd
 
@@ -113,7 +115,7 @@ define Device/bodybytes_bodybytes_recovery
   IMAGE_SIZE := 65152k
   IMAGES := recovery.bin
   IMAGE/recovery.bin := append-image-stage initramfs-kernel.bin | check-size
-  DEVICE_PACKAGES := $(BODYBYTES_PACKAGES) parted
+  DEVICE_PACKAGES := $(BODYBYTES_PACKAGES) bodybytes-provision kmod-mtd-rw parted
   SUPPORTED_DEVICES := bodybytes,bodybytes
 endef
 TARGET_DEVICES += bodybytes_bodybytes_recovery

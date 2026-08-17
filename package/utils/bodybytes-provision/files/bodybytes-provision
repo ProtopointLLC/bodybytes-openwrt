@@ -1,0 +1,145 @@
+#!/bin/sh
+# Bodybytes field provisioning: WiFi MAC, branding, eMMC format. Recovery
+# image only. MACs are always explicit - generation is host-side only.
+
+# eeprom_factory_0 nvmem cell size (DTS eeprom@0 reg); rest of the
+# partition is 0xFF, which `mtd write` pads in automatically.
+EEPROM_SIZE=1024
+
+usage() {
+	cat >&2 <<-EOF
+	Usage: bodybytes-provision <command> [args]
+
+	Commands:
+	  set-mac <XX:XX:XX:XX:XX:XX>   Rewrite the WiFi MAC (factory NOR partition)
+	  set-branding <name>           Rewrite the branding string (u-boot-env)
+	  format-emmc                   Wipe and repartition the eMMC (DESTRUCTIVE)
+	EOF
+	exit 1
+}
+
+require_mtd_rw() {
+	insmod mtd-rw i_want_a_brick=1 2>/dev/null
+	if ! lsmod | grep -q '^mtd_rw'; then
+		echo "failed to load kmod-mtd-rw" >&2
+		exit 1
+	fi
+}
+
+mac_add() {
+	# $1 = MAC (colon-separated), $2 = delta to add to the last octet (mod 256)
+	local base="${1%:*}"
+	local last="${1##*:}"
+	printf '%s:%02x' "$base" $(( (0x$last + $2) & 0xff ))
+}
+
+write_mac_at() {
+	# $1 = target file, $2 = byte offset, $3 = MAC (colon-separated)
+	local hex=$(echo "$3" | tr -d ':')
+	printf "$(printf '%s' "$hex" | sed 's/../\\x&/g')" | dd of="$1" bs=1 seek="$2" count=6 conv=notrunc 2>/dev/null
+}
+
+do_set_mac() {
+	local mac="$1"
+	mac=$(echo "$mac" | tr 'A-F' 'a-f')
+	echo "$mac" | grep -qE '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || {
+		echo "bad MAC: $mac (expected XX:XX:XX:XX:XX:XX)" >&2
+		exit 1
+	}
+	[ "$mac" = "00:00:00:00:00:00" ] && { echo "MAC must not be all zeros" >&2; exit 1; }
+	octet0=$(( 0x${mac%%:*} ))
+	[ $(( octet0 & 0x01 )) -ne 0 ] && { echo "MAC must not be multicast (LSB of first octet must be 0)" >&2; exit 1; }
+
+	grep -q '"factory"' /proc/mtd || { echo "'factory' MTD partition not found" >&2; exit 1; }
+
+	echo "WiFi MAC: $mac"
+	require_mtd_rw
+
+	local tmp
+	tmp=$(mktemp)
+	trap 'rm -f "$tmp"; rmmod mtd-rw 2>/dev/null' EXIT
+	mtd -l $EEPROM_SIZE dump factory > "$tmp" 2>/dev/null
+
+	# primary MAC at 0x004, MAC0 (primary+1) at 0x028, MAC1 (primary+3) at 0x02e
+	write_mac_at "$tmp" 4 "$mac"
+	write_mac_at "$tmp" 40 "$(mac_add "$mac" 1)"
+	write_mac_at "$tmp" 46 "$(mac_add "$mac" 3)"
+	mtd write "$tmp" factory || { echo "writing 'factory' partition failed" >&2; exit 1; }
+	rm -f "$tmp"
+
+	echo "Done. Reboot for changes to take effect."
+}
+
+do_set_branding() {
+	local branding="$1"
+	echo "$branding" | grep -qE '^[A-Za-z0-9_-]+$' || {
+		echo "bad branding string: $branding (alphanumeric/-/_ only)" >&2
+		exit 1
+	}
+	grep -q '"u-boot-env"' /proc/mtd || { echo "'u-boot-env' MTD partition not found" >&2; exit 1; }
+
+	echo "Branding: $branding"
+	require_mtd_rw
+	trap 'rmmod mtd-rw 2>/dev/null' EXIT
+	fw_setenv branding "$branding" || { echo "writing 'branding' to u-boot-env failed" >&2; exit 1; }
+
+	echo "Done. Reboot for changes to take effect."
+}
+
+do_format_emmc() {
+	cat >&2 <<-'EOF'
+	WARNING: this will PERMANENTLY ERASE ALL DATA on /dev/mmcblk0:
+	  - the kernel and rootfs partitions
+	  - the rootfs_data overlay (all installed packages and settings)
+	  - the data partition (all user files under /mnt/data)
+	The eMMC will be discarded and repartitioned from scratch. You will
+	need to reboot afterwards for the new partition table to take effect.
+	EOF
+	printf 'Type "yes" to continue: ' >&2
+	read -r reply
+	[ "$reply" = "yes" ] || { echo "Aborted." >&2; exit 1; }
+
+	echo "Unmounting /dev/mmcblk0 partitions..."
+	umount /dev/mmcblk0p* 2>/dev/null
+
+	echo "Discarding /dev/mmcblk0..."
+	blkdiscard -f /dev/mmcblk0 || { echo "blkdiscard failed" >&2; exit 1; }
+	partprobe /dev/mmcblk0
+
+	echo "Creating GPT partition table..."
+	parted -s /dev/mmcblk0 mklabel gpt || { echo "parted mklabel failed" >&2; exit 1; }
+	parted -s /dev/mmcblk0 mkpart kernel 1MiB 33MiB
+	parted -s /dev/mmcblk0 mkpart rootfs 33MiB 545MiB
+	parted -s /dev/mmcblk0 mkpart rootfs_data 545MiB 4641MiB
+	parted -s /dev/mmcblk0 mkpart data 4641MiB 100%
+	sync
+	partprobe /dev/mmcblk0
+
+	echo "Formatting data partition (ext4)..."
+	mkfs.ext4 -L data /dev/mmcblk0p4 || { echo "mkfs.ext4 failed" >&2; exit 1; }
+	sync
+
+	echo "Done. Reboot recovery to use the new partition table, then install the sysupgrade image to eMMC via LuCI."
+}
+
+[ $# -ge 1 ] || usage
+cmd="$1"
+shift
+
+case "$cmd" in
+set-mac)
+	[ $# -eq 1 ] || usage
+	do_set_mac "$1"
+	;;
+set-branding)
+	[ $# -eq 1 ] || usage
+	do_set_branding "$1"
+	;;
+format-emmc)
+	[ $# -eq 0 ] || usage
+	do_format_emmc
+	;;
+*)
+	usage
+	;;
+esac
