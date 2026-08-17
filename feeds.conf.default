@@ -1,5 +1,5 @@
-src-git packages https://github.com/StarGate01/bodybytes-packages.git^84b68e2b5a46302d0c7bfe47b33622e0b18675fe
-src-git luci https://github.com/StarGate01/bodybytes-luci.git^e4c4a79c67d82da4a8c9b1169acb81e3c2e52420
+src-git packages https://github.com/ProtopointLLC/bodybytes-packages.git^84b68e2b5a46302d0c7bfe47b33622e0b18675fe
+src-git luci https://github.com/ProtopointLLC/bodybytes-luci.git^e4c4a79c67d82da4a8c9b1169acb81e3c2e52420
 src-git immortalwrt_luci https://github.com/immortalwrt/luci.git^c48d3f0f28923255ffbf9d5cc8137bf4d2839a0b
 src-git routing https://git.openwrt.org/feed/routing.git^b2097c85bef85251364f59a6b2a3ed1f9f5c0c21
 src-git telephony https://git.openwrt.org/feed/telephony.git^2618106d5846a4a542fdf5809f0d3ed228ce439b

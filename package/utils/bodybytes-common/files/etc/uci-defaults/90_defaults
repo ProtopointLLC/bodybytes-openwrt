@@ -1,36 +1,52 @@
 #!/bin/sh
 
 . /lib/functions.sh
+. /lib/functions/system.sh
+. /lib/upgrade/common.sh
 
 board=$(board_name)
 
 case "$board" in
 bodybytes,bodybytes)
-	# Root password
-	printf 'bodybytes\nbodybytes\n' | passwd root
+	# Branding string from u-boot-env
+	BRANDING=$(fw_printenv -n branding 2>/dev/null)
+	[ -z "$BRANDING" ] && BRANDING="bodybytes"
+
+	# Recovery boots from initramfs, fixed password avoids lockout
+	if [ "$(rootfs_type)" = "tmpfs" ]; then
+		VARIANT_SUFFIX="-recovery"
+		ROOT_PASSWORD="recovery"
+	else
+		VARIANT_SUFFIX=""
+		ROOT_PASSWORD="$BRANDING"
+	fi
+
+	MAC_SUFFIX=$(mtd_get_mac_binary factory 0x4 | awk -F: '{print $4$5$6}')
+	SSID="${BRANDING}${VARIANT_SUFFIX}${MAC_SUFFIX:+-$MAC_SUFFIX}"
+
+	printf '%s\n%s\n' "$ROOT_PASSWORD" "$ROOT_PASSWORD" | passwd root
 
 	# Hostname and syslog to UART
-	uci -q set system.@system[0].hostname='bodybytes'
+	uci -q set system.@system[0].hostname="$BRANDING"
 	uci -q set system.@system[0].log_file='/dev/console'
 	uci -q commit system
 
 	# mDNS (avahi): pin the published hostname
 	if [ -f /etc/avahi/avahi-daemon.conf ]; then
 		grep -q '^host-name=' /etc/avahi/avahi-daemon.conf || \
-			sed -i '/^\[server\]/a host-name=bodybytes' /etc/avahi/avahi-daemon.conf
+			sed -i "/^\[server\]/a host-name=${BRANDING}" /etc/avahi/avahi-daemon.conf
 	fi
 
 	# WiFi - WPA3/WPA2 mixed, US region
 	uci -q set wireless.radio0.country='US'
 	uci -q set wireless.radio0.channel='auto'
-	uci -q set wireless.default_radio0.ssid='Bodybytes'
+	uci -q set wireless.default_radio0.ssid="$SSID"
 	uci -q set wireless.default_radio0.encryption='sae-mixed'
-	uci -q set wireless.default_radio0.key='bodybytes'
+	uci -q set wireless.default_radio0.key="$BRANDING"
 	uci -q set wireless.default_radio0.disabled='0'
 	uci -q commit wireless
 
-	# IPv4: 192.168.1.1/24
-	# IPv6: fixed ULA prefix fd13:37be:ef00::/48
+	# IPv4 192.168.1.1/24, IPv6 fixed ULA prefix fd13:37be:ef00::/48
 	BRDEV=$(uci add network device)
 	uci set "network.${BRDEV}.name=br-lan"
 	uci set "network.${BRDEV}.type=bridge"
@@ -64,8 +80,8 @@ bodybytes,bodybytes)
 	fi
 
 	# Standard user (uid/gid 8000), owns the data partition
-	group_exists bodybytes || group_add bodybytes 8000
-	user_exists bodybytes || user_add bodybytes 8000 8000 Bodybytes /var /bin/false
+	group_exists "$BRANDING" || group_add "$BRANDING" 8000
+	user_exists "$BRANDING" || user_add "$BRANDING" 8000 8000 "$BRANDING" /var /bin/false
 
 	# eMMC/SD data partition at /mnt/data.
 	uci -q set fstab.@global[0].delay_root='5'
@@ -80,40 +96,40 @@ bodybytes,bodybytes)
 	# TLS PKI — CA + signed server cert
 	[ "$(date +%Y)" -lt 2025 ] && date -s "2026-01-01 00:00:00"
 	openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
-		-keyout /etc/bodybytes-ca.key -out /etc/bodybytes-ca.crt \
+		-keyout /etc/ca.key -out /etc/ca.crt \
 		-days 18250 -nodes -sha256 \
-		-subj "/C=US/O=Bodybytes/CN=Bodybytes CA" \
+		-subj "/C=US/O=${BRANDING}/CN=${BRANDING} CA" \
 		-addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
 		-addext "keyUsage=critical,keyCertSign,cRLSign"
 	openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
 		-keyout /etc/uhttpd.key -out /tmp/uhttpd.csr \
 		-nodes -sha256 \
-		-subj "/C=US/O=Bodybytes/CN=bodybytes.local"
-	printf 'subjectAltName=DNS:bodybytes.local,DNS:bodybytes,IP:192.168.1.1,IP:fd13:37be:ef00::1\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n' \
+		-subj "/C=US/O=${BRANDING}/CN=${BRANDING}.local"
+	printf 'subjectAltName=DNS:%s.local,DNS:%s,IP:192.168.1.1,IP:fd13:37be:ef00::1\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n' "$BRANDING" "$BRANDING" \
 		> /tmp/uhttpd-ext.cnf
 	openssl x509 -req \
 		-in /tmp/uhttpd.csr \
-		-CA /etc/bodybytes-ca.crt -CAkey /etc/bodybytes-ca.key -CAcreateserial \
+		-CA /etc/ca.crt -CAkey /etc/ca.key -CAcreateserial \
 		-out /etc/uhttpd.crt \
 		-days 18250 -sha256 \
 		-extfile /tmp/uhttpd-ext.cnf
-	cat /etc/bodybytes-ca.crt >> /etc/uhttpd.crt
-	rm /tmp/uhttpd.csr /tmp/uhttpd-ext.cnf /etc/bodybytes-ca.srl 2>/dev/null
-	cp /etc/bodybytes-ca.crt /www/bodybytes-ca.crt
+	cat /etc/ca.crt >> /etc/uhttpd.crt
+	rm /tmp/uhttpd.csr /tmp/uhttpd-ext.cnf /etc/ca.srl 2>/dev/null
+	cp /etc/ca.crt /www/ca.crt
 	uci -q set uhttpd.main.redirect_https='1'
 	uci -q commit uhttpd
 	/etc/init.d/uhttpd restart
 
 	# Samba file share: browseable so guests can list it, require login to open.
 	if [ -f /etc/config/samba4 ]; then
-		uci -q set samba4.@samba[0].description='Bodybytes'
+		uci -q set samba4.@samba[0].description="$BRANDING"
 		SHARE=$(uci add samba4 sambashare)
 		uci set "samba4.${SHARE}.name=data"
 		uci set "samba4.${SHARE}.path=/mnt/data"
 		uci set "samba4.${SHARE}.read_only=no"
 		uci set "samba4.${SHARE}.browseable=yes"
 		uci set "samba4.${SHARE}.guest_ok=no"
-		uci set "samba4.${SHARE}.users=bodybytes"
+		uci set "samba4.${SHARE}.users=$BRANDING"
 		uci set "samba4.${SHARE}.create_mask=0666"
 		uci set "samba4.${SHARE}.dir_mask=0777"
 		uci set "samba4.${SHARE}.force_root=1"
@@ -125,7 +141,7 @@ bodybytes,bodybytes)
 		fi
 
 		/etc/init.d/samba4 start
-		printf 'bodybytes\nbodybytes\n' | smbpasswd -a -s bodybytes
+		printf '%s\n%s\n' "$BRANDING" "$BRANDING" | smbpasswd -a -s "$BRANDING"
 	fi
 
 	# Use TLS for online virtual console as well
@@ -135,7 +151,7 @@ bodybytes,bodybytes)
 	uci -q set ttyd.@ttyd[0].ipv6='1'
 	uci -q commit ttyd
 
-	# dufs web file server: /public (anonymous rw) and /protected (bodybytes rw)
+	# dufs web file server: /public (anonymous rw) and /protected ($BRANDING rw)
 	if [ -f /etc/config/dufs ]; then
 		uci -q set dufs.config.enabled='1'
 		uci -q set dufs.config.serve_path='/mnt/data'
@@ -145,7 +161,7 @@ bodybytes,bodybytes)
 		uci -q set dufs.config.allow_delete='1'
 		uci -q set dufs.config.allow_search='1'
 		uci -q delete dufs.config.auth
-		uci -q add_list dufs.config.auth='bodybytes:bodybytes@/protected:rw'
+		uci -q add_list dufs.config.auth="${BRANDING}:${BRANDING}@/protected:rw"
 		uci -q add_list dufs.config.auth='@/public:rw'
 		uci -q commit dufs
 	fi
