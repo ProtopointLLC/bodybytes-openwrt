@@ -1,6 +1,6 @@
 #!/bin/sh
 # Bodybytes field provisioning: WiFi MAC, branding, eMMC format. Recovery
-# image only. MACs are always explicit - generation is host-side only.
+# image only. set-mac takes an explicit MAC or 'random' to generate one.
 
 # eeprom_factory_0 nvmem cell size (DTS eeprom@0 reg); rest of the
 # partition is 0xFF, which `mtd write` pads in automatically.
@@ -11,7 +11,7 @@ usage() {
 	Usage: bodybytes-provision <command> [args]
 
 	Commands:
-	  set-mac <XX:XX:XX:XX:XX:XX>   Rewrite the WiFi MAC (factory NOR partition)
+	  set-mac <XX:XX:XX:XX:XX:XX|random>   Rewrite the WiFi MAC (factory NOR partition)
 	  set-branding <name>           Rewrite the branding string (u-boot-env)
 	  format-emmc                   Wipe and repartition the eMMC (DESTRUCTIVE)
 	EOF
@@ -33,6 +33,17 @@ mac_add() {
 	printf '%s:%02x' "$base" $(( (0x$last + $2) & 0xff ))
 }
 
+random_mac() {
+	# Locally-administered, unicast MAC
+	local hex mac
+	hex=$(tr -d '-' < /proc/sys/kernel/random/uuid)
+	mac=$(printf '%02x' $(( (0x$(echo "$hex" | cut -c1-2) & 0xfc) | 0x02 )) )
+	for pos in 3 5 7 9 11; do
+		mac="$mac:$(echo "$hex" | cut -c${pos}-$((pos+1)))"
+	done
+	echo "$mac"
+}
+
 write_mac_at() {
 	# $1 = target file, $2 = byte offset, $3 = MAC (colon-separated)
 	local hex=$(echo "$3" | tr -d ':')
@@ -41,6 +52,7 @@ write_mac_at() {
 
 do_set_mac() {
 	local mac="$1"
+	[ "$mac" = "random" ] && mac=$(random_mac)
 	mac=$(echo "$mac" | tr 'A-F' 'a-f')
 	echo "$mac" | grep -qE '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || {
 		echo "bad MAC: $mac (expected XX:XX:XX:XX:XX:XX)" >&2
