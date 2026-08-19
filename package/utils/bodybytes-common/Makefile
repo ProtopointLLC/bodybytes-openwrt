@@ -36,6 +36,7 @@ define Package/bodybytes-common/install
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/avahi-reprobe $(1)/etc/init.d/avahi-reprobe
+	$(INSTALL_BIN) ./files/etc/init.d/ttyd-reprobe $(1)/etc/init.d/ttyd-reprobe
 	$(INSTALL_BIN) ./files/etc/init.d/dufs-dirs $(1)/etc/init.d/dufs-dirs
 
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
