@@ -1,6 +1,6 @@
-src-git packages https://github.com/ProtopointLLC/bodybytes-packages.git^84b68e2b5a46302d0c7bfe47b33622e0b18675fe
-src-git luci https://github.com/ProtopointLLC/bodybytes-luci.git^e4c4a79c67d82da4a8c9b1169acb81e3c2e52420
-src-git immortalwrt_luci https://github.com/immortalwrt/luci.git^c48d3f0f28923255ffbf9d5cc8137bf4d2839a0b
+src-git packages https://github.com/ProtopointLLC/bodybytes-packages.git^3c997e16dc79cd8177a1f9aa82ecff342971668e
+src-git luci https://github.com/ProtopointLLC/bodybytes-luci.git^062e9675e5bcf151b1bdeaf741f0c004256ae210
+src-git immortalwrt_luci https://github.com/immortalwrt/luci.git^0439e06df7ce7f148e2cf523b65dd8ea3acc49bb
 src-git routing https://git.openwrt.org/feed/routing.git^3d7d0dc7fa43d3eb09498417407e95a6552e5312
 src-git telephony https://git.openwrt.org/feed/telephony.git^2618106d5846a4a542fdf5809f0d3ed228ce439b
 src-git video https://github.com/openwrt/video.git^094bf58da6682f895255a35a84349a79dab4bf95
